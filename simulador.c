@@ -3,12 +3,13 @@
 #include <math.h>
 #include <string.h>
 
-#define DEBUG(A) //A
+#define DEBUG(A...) printf("<DEBUG> "); printf(A)
 
 typedef struct stTableElement {
 	short lastAccess;
-  char isReferenced;
+  char wasRefered;
   char isModified;
+  char isPresent;
 } tpPage;
 
 char *substAlg;
@@ -25,13 +26,13 @@ void readInstructions(char *path) {
 	char operation;
 	memset(instructions, 0x00, 500*2*sizeof(int));
 	freopen(path, "r", stdin);
-	DEBUG(printf("===> Reading instructions\n");)
+	DEBUG("Reading instructions\n");
 	while(scanf("%x %c", &instructions[instructions[0][0]+1][0], &operation) != EOF) {
 		instructions[instructions[0][0]+1][1] = (operation == 'R' ? 0 : 1);
 		instructions[0][0]++;
-		DEBUG(printf("%x %d\n", instructions[instructions[0][0]][0], instructions[instructions[0][0]][1]);)
+		DEBUG("%x %d\n", instructions[instructions[0][0]][0], instructions[instructions[0][0]][1]);
 	}
-	DEBUG(printf("%d instructions readed\n<===\n\n\n", instructions[0][0]);)
+	DEBUG("%d instructions readed\n\n\n\n", instructions[0][0]);
 }
 
 tpPage *nextPageToBeReplaced() {
@@ -39,7 +40,7 @@ tpPage *nextPageToBeReplaced() {
 	if(strcmp(substAlg, "lru") == 0) {
 		tpPage *leastRecent = NULL;
 		for(i = 0; i < 600000; i++) {
-			if(pageTable[i].isReferenced &&
+			if(pageTable[i].isPresent &&
 					(leastRecent == NULL ||
 					 pageTable[i].lastAccess < leastRecent->lastAccess)) {
 				leastRecent = pageTable + i;
@@ -63,11 +64,13 @@ char *uniformizeAlgorithmName(char *name) {
 
 void resetPage(tpPage *page) {
 	memset(page, 0x00, sizeof(tpPage));
+	page->wasRefered = 1;
 }
 
 int main(int argc, char *argv[])
 {
 	int i;	
+	printf("Executando o simulador...\n");
 	substAlg = uniformizeAlgorithmName(argv[1]);
 	readInstructions(argv[2]);
 	pageSize = atoi(argv[3]);
@@ -77,29 +80,32 @@ int main(int argc, char *argv[])
 	memset(pageTable, 0x00, 600000*sizeof(tpPage));
 	for(i = 1; i <= instructions[0][0]; i++) {
 		unsigned int address = instructions[i][0];
-		unsigned int isWriting = instructions[i][2];
+		unsigned int isWriting = instructions[i][1];
 		unsigned int logicalAddress = address >> pageSizeBitsBoundery;
+		DEBUG("%s address %x (logical: %x) - time: %d\n", (isWriting ? "Writing on" : "Reading"), address, logicalAddress, time);
 
 		time++;
 
-		// Page fault?
-		if((referencedCount+1)*pageSize > memSize) {
-			// Use one of the methods to replace page
-			pageFaultCount++;
-			
-			tpPage *pageToBeReplaced = nextPageToBeReplaced();
-			if(pageToBeReplaced != NULL) {
-				resetPage(pageToBeReplaced);
-				referencedCount--;
-			}
-			
-		}
-
 		pageTable[logicalAddress].lastAccess = time;
-		if(pageTable[logicalAddress].isReferenced) {
-			// address are already referenced
+		if(pageTable[logicalAddress].isPresent) {
+			DEBUG("Page %x are already in memory\n", logicalAddress);
 		} else {
-			pageTable[logicalAddress].isReferenced = 1;
+			DEBUG("Page %x are not in memory\n", logicalAddress);
+
+			// Page fault?
+			if((referencedCount+1)*pageSize > memSize) {
+				DEBUG("Page fault!\n");
+				// Use one of the methods to replace page
+				pageFaultCount++;
+				
+				tpPage *pageToBeReplaced = nextPageToBeReplaced();
+				if(pageToBeReplaced != NULL) {
+					resetPage(pageToBeReplaced);
+				}
+				
+			}
+			pageTable[logicalAddress].isPresent = 1;
+			pageTable[logicalAddress].wasRefered = 1;
 			referencedCount++;
 		}
 
@@ -109,9 +115,9 @@ int main(int argc, char *argv[])
 		} else {
 			// is reading
 		}
+		DEBUG("\n\n");
 	}
 
-	printf("Executando o simulador...\n");
 	printf("Arquivo de entrada: %s\n", argv[2]);
 	printf("Tamanho da memoria fisica: %d KB\n", memSize);
 	printf("Tamanho das páginas: %d KB\n", pageSize);
