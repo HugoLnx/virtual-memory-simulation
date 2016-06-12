@@ -3,11 +3,12 @@
 #include <math.h>
 #include <string.h>
 
-#define DEBUG(A...) printf("<DEBUG> "); printf(A)
+#define DEBUG(A...) //printf("<DEBUG> "); printf(A)
+#define RECENT_DELTA_TIME 100
 
 typedef struct stTableElement {
 	short lastAccess;
-  char wasRefered;
+  char isReferenced;
   char isModified;
   char isPresent;
 } tpPage;
@@ -15,39 +16,46 @@ typedef struct stTableElement {
 char *substAlg;
 int pageSize, memSize;
 int pageSizeBitsBoundery;
-unsigned int instructions[500][2]; // [adress, operation (0 - read 1 - write]
 tpPage pageTable[600000];
 int referencedCount = 0;
 int time = 0;
 int writingCount = 0;
 int pageFaultCount = 0;
 
-void readInstructions(char *path) {
-	char operation;
-	memset(instructions, 0x00, 500*2*sizeof(int));
-	freopen(path, "r", stdin);
-	DEBUG("Reading instructions\n");
-	while(scanf("%x %c", &instructions[instructions[0][0]+1][0], &operation) != EOF) {
-		instructions[instructions[0][0]+1][1] = (operation == 'R' ? 0 : 1);
-		instructions[0][0]++;
-		DEBUG("%x %d\n", instructions[instructions[0][0]][0], instructions[instructions[0][0]][1]);
+tpPage *lruAlgorithm() {
+	unsigned int i;
+	tpPage *leastRecent = NULL;
+	for(i = 0; i < 600000; i++) {
+		if(pageTable[i].isPresent &&
+				(leastRecent == NULL ||
+				 pageTable[i].lastAccess < leastRecent->lastAccess)) {
+			leastRecent = pageTable + i;
+		}
 	}
-	DEBUG("%d instructions readed\n\n\n\n", instructions[0][0]);
+	return leastRecent;
+}
+
+tpPage *nruAlgorithm() {
+	unsigned int i;
+	int maxPoints;
+	tpPage *choosed = NULL;
+	for(i = 0; i < 600000; i++) {
+		int points = (pageTable[i].isReferenced ? 2 : 0) + (pageTable[i].isModified ? 1 : 0);
+		if(points == 3) return (pageTable+i);
+		if(points >= maxPoints) {
+			points = maxPoints;
+			choosed = pageTable+i;
+		}
+	}
+	return choosed;
 }
 
 tpPage *nextPageToBeReplaced() {
 	unsigned int i;
 	if(strcmp(substAlg, "lru") == 0) {
-		tpPage *leastRecent = NULL;
-		for(i = 0; i < 600000; i++) {
-			if(pageTable[i].isPresent &&
-					(leastRecent == NULL ||
-					 pageTable[i].lastAccess < leastRecent->lastAccess)) {
-				leastRecent = pageTable + i;
-			}
-		}
-		return leastRecent;
+		return lruAlgorithm();
 	} else if(strcmp(substAlg, "nru") == 0) {
+		return nruAlgorithm();
 	} else if(strcmp(substAlg, "seg") == 0) {
 	}
 	printf("Choose one of those page replace algorithm: LRU, NRE, SEG");
@@ -64,59 +72,78 @@ char *uniformizeAlgorithmName(char *name) {
 
 void resetPage(tpPage *page) {
 	memset(page, 0x00, sizeof(tpPage));
-	page->wasRefered = 1;
+}
+
+void resetRecentUsageBits() {
+	int i;
+	for(i = 0; i < 600000; i++) {
+		pageTable[i].isReferenced = 0;
+		pageTable[i].isModified = 0;
+	}
+}
+
+void verifyAndTreatPageFault(unsigned int logicalAddress) {
+	// Page fault?
+	if((referencedCount+1)*pageSize > memSize) {
+		DEBUG("Page fault!\n");
+		// Use one of the methods to replace page
+		pageFaultCount++;
+		
+		tpPage *pageToBeReplaced = nextPageToBeReplaced();
+		if(pageToBeReplaced != NULL) {
+			resetPage(pageToBeReplaced);
+		}
+		
+	}
+}
+
+void executeInstruction(unsigned int address, int isWriting) {
+	unsigned int logicalAddress = address >> pageSizeBitsBoundery;
+	DEBUG("%s address %x (logical: %x) - time: %d\n", (isWriting ? "Writing on" : "Reading"), address, logicalAddress, time);
+
+	pageTable[logicalAddress].lastAccess = time;
+	if(pageTable[logicalAddress].isPresent) {
+		DEBUG("Page %x are already in memory\n", logicalAddress);
+	} else {
+		DEBUG("Page %x are not in memory\n", logicalAddress);
+
+		verifyAndTreatPageFault(logicalAddress);
+		pageTable[logicalAddress].isPresent = 1;
+		pageTable[logicalAddress].isReferenced = 1;
+		referencedCount++;
+	}
+
+	if(isWriting) {
+		pageTable[logicalAddress].isModified = 1;
+		writingCount++;
+	} else {
+		// is reading
+	}
+	DEBUG("\n\n");
 }
 
 int main(int argc, char *argv[])
 {
-	int i;	
+	int i;
+	unsigned int address;
+	char operation;
+
 	printf("Executando o simulador...\n");
+
+	freopen(argv[2], "r", stdin);
+	memset(pageTable, 0x00, 600000*sizeof(tpPage));
+
 	substAlg = uniformizeAlgorithmName(argv[1]);
-	readInstructions(argv[2]);
 	pageSize = atoi(argv[3]);
 	memSize = atoi(argv[4]);
 	pageSizeBitsBoundery = (int) ceil(log2(pageSize*1024));
 
-	memset(pageTable, 0x00, 600000*sizeof(tpPage));
-	for(i = 1; i <= instructions[0][0]; i++) {
-		unsigned int address = instructions[i][0];
-		unsigned int isWriting = instructions[i][1];
-		unsigned int logicalAddress = address >> pageSizeBitsBoundery;
-		DEBUG("%s address %x (logical: %x) - time: %d\n", (isWriting ? "Writing on" : "Reading"), address, logicalAddress, time);
-
+	while(scanf("%x %c", &address, &operation) != EOF) {
 		time++;
-
-		pageTable[logicalAddress].lastAccess = time;
-		if(pageTable[logicalAddress].isPresent) {
-			DEBUG("Page %x are already in memory\n", logicalAddress);
-		} else {
-			DEBUG("Page %x are not in memory\n", logicalAddress);
-
-			// Page fault?
-			if((referencedCount+1)*pageSize > memSize) {
-				DEBUG("Page fault!\n");
-				// Use one of the methods to replace page
-				pageFaultCount++;
-				
-				tpPage *pageToBeReplaced = nextPageToBeReplaced();
-				if(pageToBeReplaced != NULL) {
-					resetPage(pageToBeReplaced);
-				}
-				
-			}
-			pageTable[logicalAddress].isPresent = 1;
-			pageTable[logicalAddress].wasRefered = 1;
-			referencedCount++;
-		}
-
-		if(isWriting) {
-			pageTable[logicalAddress].isModified = 1;
-			writingCount++;
-		} else {
-			// is reading
-		}
-		DEBUG("\n\n");
+		if(time % RECENT_DELTA_TIME == 0) resetRecentUsageBits();
+		executeInstruction(address, (operation == 'R' ? 0 : 1));
 	}
+
 
 	printf("Arquivo de entrada: %s\n", argv[2]);
 	printf("Tamanho da memoria fisica: %d KB\n", memSize);
