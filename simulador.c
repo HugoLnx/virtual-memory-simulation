@@ -3,7 +3,7 @@
 #include <math.h>
 #include <string.h>
 
-#define DEBUG(A...) //printf("<DEBUG> "); printf(A)
+#define DEBUG(A...) printf("<DEBUG> "); printf(A)
 #define RECENT_DELTA_TIME 100
 
 typedef struct stTableElement {
@@ -17,7 +17,7 @@ char *substAlg;
 int pageSize, memSize;
 int pageSizeBitsBoundery;
 tpPage pageTable[600000];
-int referencedCount = 0;
+int presentCount = 0;
 int time = 0;
 int writingCount = 0;
 int pageFaultCount = 0;
@@ -51,7 +51,6 @@ tpPage *nruAlgorithm() {
 }
 
 tpPage *nextPageToBeReplaced() {
-	unsigned int i;
 	if(strcmp(substAlg, "lru") == 0) {
 		return lruAlgorithm();
 	} else if(strcmp(substAlg, "nru") == 0) {
@@ -84,7 +83,7 @@ void resetRecentUsageBits() {
 
 void verifyAndTreatPageFault(unsigned int logicalAddress) {
 	// Page fault?
-	if((referencedCount+1)*pageSize > memSize) {
+	if((presentCount+1)*pageSize > memSize) {
 		DEBUG("Page fault!\n");
 		// Use one of the methods to replace page
 		pageFaultCount++;
@@ -93,7 +92,8 @@ void verifyAndTreatPageFault(unsigned int logicalAddress) {
 		if(pageToBeReplaced != NULL) {
 			resetPage(pageToBeReplaced);
 		}
-		
+	} else {
+		presentCount++;
 	}
 }
 
@@ -110,7 +110,6 @@ void executeInstruction(unsigned int address, int isWriting) {
 		verifyAndTreatPageFault(logicalAddress);
 		pageTable[logicalAddress].isPresent = 1;
 		pageTable[logicalAddress].isReferenced = 1;
-		referencedCount++;
 	}
 
 	if(isWriting) {
@@ -151,6 +150,7 @@ int main(int argc, char *argv[])
 	printf("Alg de substituição: %s\n", substAlg);
 	printf("Numero de Faltas de Páginas: %d\n", pageFaultCount);
 	printf("Numero de Paginas escritas: %d\n", writingCount);
+	DEBUG("Numero de Paginas em memória: %d\n", presentCount);
 
   return 0;
 }
