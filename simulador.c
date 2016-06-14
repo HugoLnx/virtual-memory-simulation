@@ -81,7 +81,7 @@ void resetRecentUsageBits() {
 	}
 }
 
-void verifyAndTreatPageFault(unsigned int logicalAddress) {
+void verifyAndTreatPageFault(unsigned int pageAddress) {
 	// Page fault?
 	if((presentCount+1)*pageSize > memSize) {
 		DEBUG("Page fault!\n");
@@ -106,22 +106,22 @@ void verifyAndTreatPageFault(unsigned int logicalAddress) {
 }
 
 void executeInstruction(unsigned int address, int isWriting) {
-	unsigned int logicalAddress = address >> pageSizeBitsBoundery;
-	DEBUG("%s address %x (logical: %x) - time: %d\n", (isWriting ? "Writing on" : "Reading"), address, logicalAddress, time);
+	unsigned int pageAddress = address >> pageSizeBitsBoundery;
+	DEBUG("%s address %x (page: %x) - time: %d\n", (isWriting ? "Writing on" : "Reading"), address, pageAddress, time);
 
-	pageTable[logicalAddress].lastAccess = time;
-	pageTable[logicalAddress].isReferenced = 1;
-	if(pageTable[logicalAddress].isPresent) {
-		DEBUG("Page %x are already in memory\n", logicalAddress);
+	pageTable[pageAddress].lastAccess = time;
+	pageTable[pageAddress].isReferenced = 1;
+	if(pageTable[pageAddress].isPresent) {
+		DEBUG("Page %x are already in memory\n", pageAddress);
 	} else {
-		DEBUG("Page %x are not in memory\n", logicalAddress);
+		DEBUG("Page %x are not in memory\n", pageAddress);
 
-		verifyAndTreatPageFault(logicalAddress);
-		pageTable[logicalAddress].isPresent = 1;
+		verifyAndTreatPageFault(pageAddress);
+		pageTable[pageAddress].isPresent = 1;
 	}
 
 	if(isWriting) {
-		pageTable[logicalAddress].isModified = 1;
+		pageTable[pageAddress].isModified = 1;
 	} else {
 		// is reading
 	}
