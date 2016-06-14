@@ -56,6 +56,7 @@ tpPage *nextPageToBeReplaced() {
 	} else if(strcmp(substAlg, "nru") == 0) {
 		return nruAlgorithm();
 	} else if(strcmp(substAlg, "seg") == 0) {
+		// seg
 	}
 	printf("Choose one of those page replace algorithm: LRU, NRE, SEG");
 	exit(1);
@@ -89,7 +90,10 @@ void verifyAndTreatPageFault(unsigned int logicalAddress) {
 		pageFaultCount++;
 		
 		tpPage *pageToBeReplaced = nextPageToBeReplaced();
-		if(pageToBeReplaced != NULL) {
+		if(pageToBeReplaced == NULL) {
+			DEBUG("Error, no page choosed");
+			exit(1);
+		} else {
 			resetPage(pageToBeReplaced);
 		}
 	} else {
@@ -102,6 +106,7 @@ void executeInstruction(unsigned int address, int isWriting) {
 	DEBUG("%s address %x (logical: %x) - time: %d\n", (isWriting ? "Writing on" : "Reading"), address, logicalAddress, time);
 
 	pageTable[logicalAddress].lastAccess = time;
+	pageTable[logicalAddress].isReferenced = 1;
 	if(pageTable[logicalAddress].isPresent) {
 		DEBUG("Page %x are already in memory\n", logicalAddress);
 	} else {
@@ -109,7 +114,6 @@ void executeInstruction(unsigned int address, int isWriting) {
 
 		verifyAndTreatPageFault(logicalAddress);
 		pageTable[logicalAddress].isPresent = 1;
-		pageTable[logicalAddress].isReferenced = 1;
 	}
 
 	if(isWriting) {
