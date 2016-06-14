@@ -37,13 +37,13 @@ tpPage *lruAlgorithm() {
 
 tpPage *nruAlgorithm() {
 	unsigned int i;
-	int maxPoints;
+	int minPoints;
 	tpPage *choosed = NULL;
 	for(i = 0; i < 600000; i++) {
 		int points = (pageTable[i].isReferenced ? 2 : 0) + (pageTable[i].isModified ? 1 : 0);
-		if(points == 3) return (pageTable+i);
-		if(points >= maxPoints) {
-			points = maxPoints;
+		if(points == 0) return (pageTable+i);
+		if(points <= minPoints) {
+			points = minPoints;
 			choosed = pageTable+i;
 		}
 	}
@@ -78,7 +78,6 @@ void resetRecentUsageBits() {
 	int i;
 	for(i = 0; i < 600000; i++) {
 		pageTable[i].isReferenced = 0;
-		pageTable[i].isModified = 0;
 	}
 }
 
@@ -86,10 +85,15 @@ void verifyAndTreatPageFault(unsigned int logicalAddress) {
 	// Page fault?
 	if((presentCount+1)*pageSize > memSize) {
 		DEBUG("Page fault!\n");
-		// Use one of the methods to replace page
 		pageFaultCount++;
 		
 		tpPage *pageToBeReplaced = nextPageToBeReplaced();
+
+		if(pageToBeReplaced->isModified) {
+			DEBUG("Writing page before replacing it");
+			writingCount++;
+		}
+
 		if(pageToBeReplaced == NULL) {
 			DEBUG("Error, no page choosed");
 			exit(1);
@@ -118,7 +122,6 @@ void executeInstruction(unsigned int address, int isWriting) {
 
 	if(isWriting) {
 		pageTable[logicalAddress].isModified = 1;
-		writingCount++;
 	} else {
 		// is reading
 	}
