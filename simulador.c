@@ -41,19 +41,20 @@ int pageFaultCount = 0;
 tpList presentPages;
 
 tpPage *lruAlgorithm() {
-	unsigned int i;
 	tpPage *leastRecent = NULL;
-	for(i = 0; i < 600000; i++) {
-		if(pageTable[i].isPresent &&
-				(leastRecent == NULL ||
-				 pageTable[i].lastAccess < leastRecent->lastAccess)) {
-			leastRecent = pageTable + i;
+	tpListEl *element = presentPages.head;
+	while(element != NULL) {
+		tpPage *page = element->page;
+		if(leastRecent == NULL ||
+				 page->lastAccess < leastRecent->lastAccess) {
+			leastRecent = page;
 		}
+		element = element->next;
 	}
 	return leastRecent;
 }
 
-void append (tpPage *page) {
+void append(tpPage *page) {
     Q.end = (Q.end + 1) % 3000;
     Q.pages[Q.end] = page;
 }
@@ -71,28 +72,26 @@ void removePresentPage(tpPage *page) {
 	tpListEl *prev, *curr;
 	prev = presentPages.head;
 	curr = presentPages.head->next;
-	while(curr != NULL && curr->page != page) {
-		prev = curr;
-		curr = curr->next;
-	}
-	if(curr == NULL) {
+	if(curr == NULL || prev->page == page) {
+		presentPages.head = prev->next;
 		free(prev);
-		presentPages.head = NULL;
 	} else {
+		while(curr->page != page) {
+			prev = curr;
+			curr = curr->next;
+		}
 		prev->next = curr->next;
 		free(curr);
 	}
 }
 
 tpPage *nruAlgorithm() {
-	unsigned int i;
 	int minPoints = 5;
 	tpPage *choosed = NULL;
 	tpListEl *pageEl = presentPages.head;
 	while(pageEl != NULL) {
 		int points;
 		tpPage *page = pageEl->page;
-		if(!page->isPresent) continue;
 
 		points = (page->isReferenced ? 2 : 0) + (page->isModified ? 1 : 0);
 		if(points == 0) return page;
@@ -122,7 +121,7 @@ tpPage *nextPageToBeReplaced() {
 	} else if(strcmp(substAlg, "nru") == 0) {
 		return nruAlgorithm();
 	} else if(strcmp(substAlg, "seg") == 0) {
-        return secAlgorithm();
+    return secAlgorithm();
 	}
 	printf("Choose one of those page replace algorithm: LRU, NRE, SEG");
 	exit(1);
@@ -141,9 +140,11 @@ void resetPage(tpPage *page) {
 }
 
 void resetRecentUsageBits() {
-	int i;
-	for(i = 0; i < 600000; i++) {
-		pageTable[i].isReferenced = 0;
+	tpListEl *element = presentPages.head;
+	while(element != NULL) {
+		tpPage *page = element->page;
+		page->isReferenced = 0;
+		element = element->next;
 	}
 }
 
@@ -178,6 +179,7 @@ void executeInstruction(unsigned int address, int isWriting) {
 
 	pageTable[pageAddress].lastAccess = time;
 	pageTable[pageAddress].isReferenced = 1;
+  pageTable[pageAddress].isReferencedSeg = 1;
 	if(pageTable[pageAddress].isPresent) {
 		DEBUG("Page %x are already in memory\n", pageAddress);
 	} else {
@@ -187,7 +189,6 @@ void executeInstruction(unsigned int address, int isWriting) {
     append(&pageTable[pageAddress]);
     addPresentPage(&pageTable[pageAddress]);
 		pageTable[pageAddress].isPresent = 1;
-    pageTable[pageAddress].isReferencedSeg = 1;
 	}
 
 	if(isWriting) {
