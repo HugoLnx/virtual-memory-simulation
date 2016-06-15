@@ -20,6 +20,15 @@ typedef struct circularQueue {
     int end;
 } queue;
 
+typedef struct stListEl {
+    struct stListEl *next;
+    tpPage *page;
+} tpListEl;
+
+typedef struct stList {
+    tpListEl *head;
+} tpList;
+
 char *substAlg;
 int pageSize, memSize;
 int pageSizeBitsBoundery;
@@ -29,6 +38,7 @@ int presentCount = 0;
 int time = 0;
 int writingCount = 0;
 int pageFaultCount = 0;
+tpList presentPages;
 
 tpPage *lruAlgorithm() {
 	unsigned int i;
@@ -50,16 +60,20 @@ void append (tpPage *page) {
 
 tpPage *nruAlgorithm() {
 	unsigned int i;
-	int minPoints;
+	int minPoints = 5;
 	tpPage *choosed = NULL;
 	for(i = 0; i < 600000; i++) {
-		int points = (pageTable[i].isReferenced ? 2 : 0) + (pageTable[i].isModified ? 1 : 0);
+		int points;
+		if(!pageTable[i].isPresent) continue;
+
+		points = (pageTable[i].isReferenced ? 2 : 0) + (pageTable[i].isModified ? 1 : 0);
 		if(points == 0) return (pageTable+i);
 		if(points <= minPoints) {
 			points = minPoints;
 			choosed = pageTable+i;
 		}
 	}
+	if(choosed == NULL) printf("HOHOHOHOHOH\n");
 	return choosed;
 }
 
@@ -122,6 +136,7 @@ void verifyAndTreatPageFault(unsigned int pageAddress) {
 			DEBUG("Error, no page choosed");
 			exit(1);
 		} else {
+			//removePresentPage(pageToBeReplaced);
 			resetPage(pageToBeReplaced);
 		}
 	} else {
@@ -141,9 +156,10 @@ void executeInstruction(unsigned int address, int isWriting) {
 		DEBUG("Page %x are not in memory\n", pageAddress);
 
 		verifyAndTreatPageFault(pageAddress);
-        append(&pageTable[pageAddress]);
+    append(&pageTable[pageAddress]);
+    //addPresentPage(&pageTable[pageAddress]);
 		pageTable[pageAddress].isPresent = 1;
-        pageTable[pageAddress].isReferencedSeg = 1;
+    pageTable[pageAddress].isReferencedSeg = 1;
 	}
 
 	if(isWriting) {
@@ -158,8 +174,9 @@ int main(int argc, char *argv[])
 {
 	unsigned int address;
 	char operation;
-    Q.begin = 0;
-    Q.end = -1;
+	Q.begin = 0;
+	Q.end = -1;
+	presentPages.head = NULL;
 
 	printf("Executando o simulador...\n");
 
