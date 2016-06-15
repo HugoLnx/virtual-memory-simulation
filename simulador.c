@@ -140,10 +140,10 @@ void executeInstruction(unsigned int address, int isWriting) {
 	} else {
 		DEBUG("Page %x are not in memory\n", pageAddress);
 
-		verifyAndTreatPageFault(logicalAddress);
-        append(&pageTable[logicalAddress]);
-		pageTable[logicalAddress].isPresent = 1;
-        pageTable[logicalAddress].isReferencedSeg = 1;
+		verifyAndTreatPageFault(pageAddress);
+        append(&pageTable[pageAddress]);
+		pageTable[pageAddress].isPresent = 1;
+        pageTable[pageAddress].isReferencedSeg = 1;
 	}
 
 	if(isWriting) {
