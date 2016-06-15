@@ -58,22 +58,50 @@ void append (tpPage *page) {
     Q.pages[Q.end] = page;
 }
 
+void addPresentPage(tpPage *page) {
+	if(page->isPresent) return;
+
+	tpListEl *element = (tpListEl*) malloc(sizeof(tpListEl));
+	element->page = page;
+	element->next = presentPages.head;
+	presentPages.head = element;
+}
+
+void removePresentPage(tpPage *page) {
+	tpListEl *prev, *curr;
+	prev = presentPages.head;
+	curr = presentPages.head->next;
+	while(curr != NULL && curr->page != page) {
+		prev = curr;
+		curr = curr->next;
+	}
+	if(curr == NULL) {
+		free(prev);
+		presentPages.head = NULL;
+	} else {
+		prev->next = curr->next;
+		free(curr);
+	}
+}
+
 tpPage *nruAlgorithm() {
 	unsigned int i;
 	int minPoints = 5;
 	tpPage *choosed = NULL;
-	for(i = 0; i < 600000; i++) {
+	tpListEl *pageEl = presentPages.head;
+	while(pageEl != NULL) {
 		int points;
-		if(!pageTable[i].isPresent) continue;
+		tpPage *page = pageEl->page;
+		if(!page->isPresent) continue;
 
-		points = (pageTable[i].isReferenced ? 2 : 0) + (pageTable[i].isModified ? 1 : 0);
-		if(points == 0) return (pageTable+i);
+		points = (page->isReferenced ? 2 : 0) + (page->isModified ? 1 : 0);
+		if(points == 0) return page;
 		if(points <= minPoints) {
 			points = minPoints;
-			choosed = pageTable+i;
+			choosed = page;
 		}
+		pageEl = pageEl->next;
 	}
-	if(choosed == NULL) printf("HOHOHOHOHOH\n");
 	return choosed;
 }
 
@@ -136,7 +164,7 @@ void verifyAndTreatPageFault(unsigned int pageAddress) {
 			DEBUG("Error, no page choosed");
 			exit(1);
 		} else {
-			//removePresentPage(pageToBeReplaced);
+			removePresentPage(pageToBeReplaced);
 			resetPage(pageToBeReplaced);
 		}
 	} else {
@@ -157,7 +185,7 @@ void executeInstruction(unsigned int address, int isWriting) {
 
 		verifyAndTreatPageFault(pageAddress);
     append(&pageTable[pageAddress]);
-    //addPresentPage(&pageTable[pageAddress]);
+    addPresentPage(&pageTable[pageAddress]);
 		pageTable[pageAddress].isPresent = 1;
     pageTable[pageAddress].isReferencedSeg = 1;
 	}
