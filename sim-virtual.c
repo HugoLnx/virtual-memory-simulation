@@ -1,3 +1,11 @@
+//
+// T2 - INF1019
+//
+// Integrantes:
+//  Douglas Mandarino - 1012377
+//  Hugo Roque -
+//
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
