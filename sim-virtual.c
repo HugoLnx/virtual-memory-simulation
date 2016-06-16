@@ -3,7 +3,7 @@
 //
 // Integrantes:
 //  Douglas Mandarino - 1012377
-//  Hugo Roque -
+//  Hugo Roque - 1311162
 //
 
 #include <stdio.h>
